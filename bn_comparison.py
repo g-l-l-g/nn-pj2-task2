@@ -37,13 +37,19 @@ NUM_WORKERS = 2
 # --- 默认优化器和调度器配置 ---
 DEFAULT_OPTIMIZER_CLASS = optim.Adam
 DEFAULT_OPTIMIZER_PARAMS = {"lr": LEARNING_RATE}
+DEFAULT_SCHEDULER_CLASS = None
+
+# --- 实验一的模型配置 ---
+"""
 DEFAULT_SCHEDULER_CLASS = optim.lr_scheduler.MultiStepLR
 DEFAULT_SCHEDULER_PARAMS = {
     "milestones": [20, 27],
     "gamma": 0.1
 }
+"""
 
-# --- 模型配置 ---
+# --- 实验一的模型配置 ---
+'''
 model_configurations = [
     {
         "name": "VGG_A",
@@ -64,6 +70,51 @@ model_configurations = [
         "name": "VGG_A_BN_1d_only",
         "model_class": VGG_A_BatchNorm,
         "params": {"num_classes": 10, "init_weights_flag": True, "batch_norm_2d": False, "batch_norm_1d": True}
+    },
+]
+'''
+
+# --- 实验二的模型配置 ---
+model_configurations = [
+    {
+        "name": "VGG_A_lr_2e-3",
+        "model_class": VGG_A,
+        "params": {"num_classes": 10, "init_weights_flag": True},
+        "optimizer_class": optim.SGD,
+        "optimizer_params": {
+            "lr": 2e-3,
+            "momentum": 0.9,
+        }
+    },
+    {
+        "name": "VGG_A_BN_2d_only_lr_2e-3",
+        "model_class": VGG_A_BatchNorm,
+        "params": {"num_classes": 10, "init_weights_flag": True, "batch_norm_2d": True, "batch_norm_1d": False},
+        "optimizer_class": optim.SGD,
+        "optimizer_params": {
+            "lr": 2e-3,
+            "momentum": 0.9,
+        }
+    },
+    {
+        "name": "VGG_A_lr_1e-4",
+        "model_class": VGG_A,
+        "params": {"num_classes": 10, "init_weights_flag": True},
+        "optimizer_class": optim.SGD,
+        "optimizer_params": {
+            "lr": 1e-4,
+            "momentum": 0.9,
+        }
+    },
+    {
+        "name": "VGG_A_BN_2d_only_lr_1e-4",
+        "model_class": VGG_A_BatchNorm,
+        "params": {"num_classes": 10, "init_weights_flag": True, "batch_norm_2d": True, "batch_norm_1d": False},
+        "optimizer_class": optim.SGD,
+        "optimizer_params": {
+            "lr": 1e-4,
+            "momentum": 0.9,
+        }
     },
 ]
 
@@ -159,7 +210,8 @@ def main():
             base_log_dir=LOG_DIR_BASE_TENSORBOARD,
             hparams_dict=current_hparams,
             scheduler=scheduler,
-            model_save_dir=model_weights_save_dir
+            model_save_dir=model_weights_save_dir,
+            seed=SEED,
         )
         all_experiment_results[model_name] = results
         print(f"Finished training {model_name}")
