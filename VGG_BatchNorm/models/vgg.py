@@ -9,7 +9,6 @@ from .. import utils
 # import utils
 
 
-# ## Models implementation
 def get_number_of_parameters(model):
     parameters_n = 0
     for parameter in model.parameters():
