@@ -1,8 +1,10 @@
 # train.py
 import os
 import torch
-from torch.utils.tensorboard import SummaryWriter
+import json
 from tqdm import tqdm
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
 
 
 def _evaluate_model_on_epoch(model, data_loader, criterion, device):
@@ -48,6 +50,7 @@ def train_single_model_experiment(
         num_epochs: int,
         device: torch.device,
         base_log_dir: str,
+        seed: int,
         hparams_dict: dict = None,
         scheduler: torch.optim.lr_scheduler._LRScheduler = None,
         model_save_dir: str = None
@@ -66,6 +69,29 @@ def train_single_model_experiment(
 
     best_val_accuracy = 0.0
     # best_model_path = None # Not strictly needed if filename is fixed
+
+    # --- 保存模型配置信息 ---
+    if hparams_dict and model_save_dir:
+        model_config_to_save = {
+            "seed": seed,
+            "model_name": model_name,
+            "model_class": model.__class__.__name__,
+            "criterion": criterion.__class__.__name__,
+            "total_epochs_planned_for_run": num_epochs,
+            "input_hyperparameters": hparams_dict if hparams_dict else {},
+        }
+        if model_config_to_save["model_class"] == "VGG_A_BatchNorm":
+            model_config_to_save["model_params"] = {
+                "batch_norm_1d": model.batch_norm_1d,
+                "batch_norm_2d": model.batch_norm_2d,
+            }
+        config_save_path = os.path.join(model_save_dir, f"{model_name}_config.json")
+        try:
+            with open(config_save_path, 'w') as f:
+                json.dump(model_config_to_save, f, indent=4)
+            print(f"Saved model configuration to {config_save_path}")
+        except Exception as e:
+            print(f"Warning: Could not save model configuration to {config_save_path}. Error: {e}")
 
     for epoch in tqdm(range(num_epochs), unit='epoch', desc=f"Training {model_name}"):
         model.train()
@@ -115,16 +141,37 @@ def train_single_model_experiment(
 
         # Save best model
         if model_save_dir and epoch_val_accuracy > best_val_accuracy:
-            # Ensure val_loader was not empty and returned a valid accuracy
             if len(val_loader.dataset) > 0 and total_train > 0:
                 best_val_accuracy = epoch_val_accuracy
-                # The model_save_dir is specific to this model, e.g., .../saved_models/VGG_A/
-                # So, the file name can be simple.
                 current_best_model_path = os.path.join(model_save_dir, "best_model.pth")
                 torch.save(model.state_dict(), current_best_model_path)
                 print(
                     f"Epoch {epoch + 1}: New best model saved to {current_best_model_path}"
                     f" (Val Acc: {best_val_accuracy:.2f}%)")
+
+                # --- 保存模型配置信息 ---
+                model_config_to_save = {
+                    "model_name": model_name,
+                    "saved_at_epoch": epoch + 1,
+                    "total_epochs_planned_for_run": num_epochs,
+                    "metrics_at_this_epoch": {
+                        "validation_accuracy": epoch_val_accuracy,
+                        "validation_loss": avg_epoch_val_loss,
+                        "training_accuracy": epoch_train_accuracy,
+                        "training_loss": avg_epoch_train_loss,
+                    },
+                }
+                config_save_path = os.path.join(model_save_dir, "best_model_result.json")
+                try:
+                    with open(config_save_path, 'w') as f:
+                        json.dump(model_config_to_save, f, indent=4)
+                    print(f"Saved model configuration to {config_save_path}")
+                except Exception as e:
+                    print(f"Warning: Could not save model configuration to {config_save_path}. Error: {e}")
+
+        # 保存中间过程的模型权重
+        current_model_path = os.path.join(model_save_dir, f"epoch_{epoch + 1}.pth")
+        torch.save(model.state_dict(), current_model_path)
 
         # Step the scheduler (typically after an epoch)
         if scheduler:
@@ -141,7 +188,6 @@ def train_single_model_experiment(
             "hparam/final_train_loss": epoch_train_losses[-1] if epoch_train_losses else float('inf'),
             "hparam/final_validation_loss": epoch_val_losses[-1] if epoch_val_losses else float('inf'),
         }
-
 
         sanitized_hparams = {}
         for k, v in hparams_dict.items():
